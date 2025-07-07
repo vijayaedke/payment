@@ -1,0 +1,225 @@
+openapi: 3.0.4
+info:
+  title: Swagger - Customer Account & Transactions
+  description: |-
+    A customer has an account. For each operation performed by the customer, a
+    transaction is created and associated with their respective account.
+    Transactions are specified by an identifier, a type, an amount, and a creation date.
+    The available types are purchase, installment purchase, withdrawal, and payments.
+    Purchase, installment purchase, and withdrawal transaction types are stored with
+    negative amounts (debt transactions), while payments are stored with positive
+    amounts (credit transactions).
+  version: 1.0.12
+servers:
+  - url: http://localhost:9090/api/v1
+paths:
+  /api/v1/pismo/account:
+    post:
+      summary: Create a new account
+      tags:
+        - Accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: Account successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+              example:
+                account_id: 9
+                document_number: "673589"
+        '400':
+          description: Invalid account creation payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: ACC_ERR_001
+                error_msg: Invalid account creation payload
+        '500':
+          description: Failed account creation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error_code: ACC_ERR_002
+                error_msg: Failed account creation
+
+  /api/v1/pismo/account/{id}:
+    get:
+      summary: Get account details by ID
+      tags:
+        - Accounts
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Account ID
+      responses:
+        "200":
+          description: Account found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountResponse"
+              example:
+                account_id: 9
+                document_number: "673589"
+        "400":
+          description: Invalid id format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: ACC_ERR_004
+                error_msg: Invalid account id format provided
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: ACC_ERR_003
+                error_msg: Account details not found/doesn't exists
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: ACC_ERR_005
+                error_msg: Failed to get account id details
+
+  
+  /api/v1/pismo/transactions:
+    post:
+      summary: Create a new transaction
+      tags:
+        - Transactions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionRequest"
+      responses:
+        "201":
+          description: Transaction successfully created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "404":
+          description: Account or Operation type not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                AccountNotFound:
+                  summary: Account does not exist
+                  value:
+                    error_code: ACC_ERR_003
+                    error_msg: Account details not found/doesn't exist
+                OperationNotFound:
+                  summary: Operation type does not exist
+                  value:
+                    error_code: TXN_ERR_008
+                    error_msg: Operation id details not found/doesn't exists
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example: 
+                error_code: TXN_ERR_001
+                error_msg: Invalid transaction request payload
+        "500":
+          description: Transaction failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error_code: TXN_ERR_007
+                error_msg: Failed transaction details
+
+components:
+  schemas:
+    CreateAccountRequest:
+      type: object
+      required:
+        - document_number
+      properties:
+        document_number:
+          type: string
+          example: "673589"
+
+    AccountResponse:
+      type: object
+      properties:
+        account_id:
+          type: integer
+          example: 9
+        document_number:
+          type: string
+          example: "673589"
+
+    CreateTransactionRequest:
+      type: object
+      required:
+        - account_id
+        - operation_type_id
+        - amount
+      properties:
+        account_id:
+          type: integer
+          example: 7
+        operation_type_id:
+          type: integer
+          example: 2
+        amount:
+          type: number
+          format: float
+          example: 3998.56
+
+    TransactionResponse:
+      type: object
+      properties:
+        transaction_id:
+          type: integer
+          example: 5
+        account_id:
+          type: integer
+          example: 7
+        operation_type_id:
+          type: integer
+          example: 2
+        amount:
+          type: number
+          format: float
+          example: -3998.56
+
+    ErrorResponse:
+      type: object
+      properties:
+        error_code:
+          type: string
+          example: ACC_ERR_003
+        error_msg:
+          type: string
+          example: Account details not found/doesn't exist
