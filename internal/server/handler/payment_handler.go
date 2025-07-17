@@ -41,6 +41,19 @@ func (h *Handler) CreateTransaction(ctx *gin.Context) {
 		return
 	}
 
+	if err == utils.InsufficientCredit {
+		h.logger.Error("Insufficient available credit to perform transaction", zap.Error(err), zap.Any("txn_request", txnReq))
+		ctx.JSON(http.StatusBadRequest, models.InsufficientCreditTransactionResponse{
+			AccountId:            resp.AccountID,
+			AvailableCreditLimit: *resp.AvailableCreditLimit,
+			Error: models.ErrorResponse{
+				ErrorCode: utils.INSUFFICIENT_CREDIT_LIMIT,
+				ErrorMsg:  utils.INSUFFICIENT_CREDIT_LIMIT_MSG,
+			},
+		})
+		return
+	}
+
 	if resp == nil || err != nil {
 		h.logger.Error("Failed CreateTransaction ", zap.Error(err), zap.Any("txn_request", txnReq))
 		ctx.JSON(http.StatusInternalServerError, models.ErrorResponse{

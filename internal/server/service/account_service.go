@@ -3,14 +3,20 @@ package service
 import (
 	"payment/internal/server/models"
 	"payment/internal/server/models/entities"
+	"payment/internal/server/utils"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
 func (s *PaymentService) CreateAccount(ctx *gin.Context, accountData *models.AccountRequest) (*models.AccountResponse, error) {
+	var availableCreditLimit = utils.DEFAULT_AVAILABLE_CREDIT_LIMIT
+	if accountData.AvailableCreditLimit != nil {
+		availableCreditLimit = *accountData.AvailableCreditLimit
+	}
 	resp, err := s.mysqlClient.Create(&entities.Account{
-		DocumentNumber: accountData.DocumentNumber,
+		DocumentNumber:       accountData.DocumentNumber,
+		AvailableCreditLimit: availableCreditLimit,
 	})
 	if err != nil {
 		s.logger.Error("Failed mysqlClient.Create", zap.Error(err), zap.String("document_number", accountData.DocumentNumber))
@@ -18,8 +24,9 @@ func (s *PaymentService) CreateAccount(ctx *gin.Context, accountData *models.Acc
 	}
 	accountEntity := resp.(*entities.Account)
 	accountResponse := &models.AccountResponse{
-		AccountID:      accountEntity.AccountID,
-		DocumentNumber: accountEntity.DocumentNumber,
+		AccountID:            accountEntity.AccountID,
+		DocumentNumber:       accountEntity.DocumentNumber,
+		AvailableCreditLimit: accountEntity.AvailableCreditLimit,
 	}
 
 	return accountResponse, nil

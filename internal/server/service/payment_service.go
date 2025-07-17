@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -14,16 +15,18 @@ import (
 
 func (s *PaymentService) CreateTransaction(ctx *gin.Context, txnReq *models.TransactionRequest) (*models.TransactionResponse, error) {
 	var (
-		accountIDExists, operationIDExists bool
-		wg                                 sync.WaitGroup
-		accountData                        entities.Account
-		operationData                      entities.OperationsTypes
+		operationIDExists bool
+		wg                sync.WaitGroup
+		accountData       entities.Account
+		operationData     entities.OperationsTypes
+		response          interface{}
+		err               error
 	)
 
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		accountIDExists = s.mysqlClient.Exists(&accountData, utils.ACCOUNT_ID_PARAM, txnReq.AccountId)
+		response, err = s.mysqlClient.FindOne(&accountData, txnReq.AccountId)
 	}()
 
 	go func() {
@@ -33,7 +36,8 @@ func (s *PaymentService) CreateTransaction(ctx *gin.Context, txnReq *models.Tran
 
 	wg.Wait()
 
-	if !accountIDExists {
+	accountDetails := response.(*entities.Account)
+	if response == nil || accountDetails.AccountID != txnReq.AccountId {
 		s.logger.Error("Failed mysqlClient.Exists: Provided account id doesn't exists", zap.Int("account_id", txnReq.AccountId))
 		return nil, utils.AccIdNotExists
 	}
@@ -44,8 +48,36 @@ func (s *PaymentService) CreateTransaction(ctx *gin.Context, txnReq *models.Tran
 	}
 
 	amount := txnReq.Amount
+	if amount < 0 {
+		s.logger.Error("Failed operation type id with incorrect amount format ", zap.Float64("amount", amount), zap.Int("account_id", txnReq.AccountId))
+		return nil, fmt.Errorf("incorrect amount format")
+	}
+
 	if txnReq.OperationTypeID != models.PAYMENT {
 		amount = -txnReq.Amount
+	}
+
+	fmt.Println("balance = ", accountDetails.AvailableCreditLimit)
+	if txnReq != nil && accountDetails.AvailableCreditLimit < txnReq.Amount {
+		s.logger.Error("Insufficient available credit limit", zap.Float64("amount", amount), zap.Int("account_id", txnReq.AccountId),
+			zap.Float64("available_credit_limit", accountDetails.AvailableCreditLimit))
+		return &models.TransactionResponse{
+			AccountID:            txnReq.AccountId,
+			AvailableCreditLimit: &accountDetails.AvailableCreditLimit,
+		}, utils.InsufficientCredit
+	}
+
+	var updatedAccountDetails = entities.Account{
+		AvailableCreditLimit: accountDetails.AvailableCreditLimit - txnReq.Amount,
+	}
+	updateCredit := s.mysqlClient.Update(ctx, accountData, "account_id", txnReq.AccountId, updatedAccountDetails)
+	if updateCredit != nil {
+		s.logger.Error("Failed to Update the available credit limit", zap.Error(updateCredit), zap.Float64("amount", amount), zap.Int("account_id", txnReq.AccountId),
+			zap.Float64("available_credit_limit", accountDetails.AvailableCreditLimit))
+		return &models.TransactionResponse{
+			AccountID:            txnReq.AccountId,
+			AvailableCreditLimit: &accountDetails.AvailableCreditLimit,
+		}, utils.InsufficientCredit
 	}
 
 	resp, err := s.mysqlClient.Create(&entities.Transaction{

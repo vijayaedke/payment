@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -19,6 +20,7 @@ type MysqlClientService interface {
 	Find(data interface{}) (interface{}, error)
 	Create(interface{}) (interface{}, error)
 	Exists(data interface{}, paramName string, id any) bool
+	Update(ctx context.Context, entity interface{}, paramName string, id any, data interface{}) error
 }
 
 func InitMysqlClient() MysqlClientService {
@@ -75,4 +77,20 @@ func (m *DBParams) Exists(data interface{}, paramName string, id any) bool {
 	}
 
 	return true
+}
+
+func (m *DBParams) Update(ctx context.Context, entity interface{}, paramName string, id any, data interface{}) error {
+	query := fmt.Sprintf("`%s` = ?", paramName)
+	resp := m.mysqlClient.Where(query, id).Updates(&data)
+	if resp.Error != nil {
+		if errors.Is(resp.Error, gorm.ErrRecordNotFound) {
+			return gorm.ErrRecordNotFound
+		}
+		return resp.Error
+	}
+
+	if resp.RowsAffected == 0 {
+		return fmt.Errorf("Update query failed")
+	}
+	return nil
 }

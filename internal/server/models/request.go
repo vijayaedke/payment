@@ -1,16 +1,17 @@
 package models
 
 type AccountRequest struct {
-	DocumentNumber string `json:"document_number"`
+	DocumentNumber       string   `json:"document_number"`
+	AvailableCreditLimit *float64 `json:"available_credit_limit,omitempty"`
 }
 
 type OperationType int
 
 const (
-	PURCHASE OperationType = 1
+	PURCHASE             OperationType = 1
 	INSTALLMENT_PURCHASE OperationType = 2
-	WITHDRAWAL OperationType = 3
-	PAYMENT OperationType = 4
+	WITHDRAWAL           OperationType = 3
+	PAYMENT              OperationType = 4
 )
 
 type TransactionRequest struct {
